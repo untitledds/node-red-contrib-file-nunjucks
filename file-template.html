@@ -1,0 +1,214 @@
+<!-- Node-RED File Template Configuration -->
+<script type="text/javascript">
+    RED.nodes.registerType('file-template', {
+        category: 'function',
+        color: '#E7E7AE',
+        defaults: {
+            name: {value: ""},
+            filename: {value: "", required: true},
+            format: {value: "handlebars"},
+            syntax: {value: "mustache"},
+            template: {value: ""},
+            field: {value: "payload", required: true},
+            fieldType: {value: "msg"},
+            output: {value: "str"}
+        },
+        inputs: 1,
+        outputs: 1,
+        icon: "file.png",
+        label: function() {
+            if (this.name) {
+                return this.name;
+            }
+            if (this.filename) {
+                return "file-template: " + this.filename.split('/').pop();
+            }
+            return "file-template";
+        },
+        labelStyle: function() {
+            return this.name ? "node_label_italic" : "";
+        },
+        oneditprepare: function() {
+            var node = this;
+            
+            // Initialize field type selector
+            $("#node-input-fieldType").typedInput({
+                type: "msg",
+                types: ["msg", "flow", "global"],
+                typeField: "#node-input-fieldType"
+            });
+            
+            // File picker button
+            $("#node-input-filename-picker").click(function() {
+                // Simple file picker - in real implementation you might want a proper file browser
+                var filename = prompt("Enter template file path:", node.filename || "Html/TodoList.html");
+                if (filename) {
+                    $("#node-input-filename").val(filename);
+                }
+            });
+            
+            // Template format change handler
+            $("#node-input-format").change(function() {
+                var format = $(this).val();
+                if (format === "handlebars" || format === "mustache") {
+                    $("#template-syntax-row").show();
+                } else {
+                    $("#template-syntax-row").hide();
+                }
+            });
+            
+            // Initialize visibility
+            $("#node-input-format").trigger('change');
+        },
+        oneditsave: function() {
+            // Validate filename
+            var filename = $("#node-input-filename").val().trim();
+            if (!filename) {
+                return false;
+            }
+        }
+    });
+</script>
+
+<!-- Node Configuration Dialog -->
+<script type="text/html" data-template-name="file-template">
+    <div class="form-row">
+        <label for="node-input-name"><i class="fa fa-tag"></i> Name</label>
+        <input type="text" id="node-input-name" placeholder="Node name">
+    </div>
+    
+    <div class="form-row">
+        <label for="node-input-filename"><i class="fa fa-file-o"></i> Template File</label>
+        <input type="text" id="node-input-filename" placeholder="path/to/template.html" style="width: calc(100% - 30px);">
+        <button type="button" id="node-input-filename-picker" class="editor-button" style="width: 25px; margin-left: 5px;">
+            <i class="fa fa-folder-open"></i>
+        </button>
+    </div>
+    
+    <div class="form-row">
+        <label for="node-input-format"><i class="fa fa-code"></i> Template Format</label>
+        <select id="node-input-format">
+            <option value="handlebars">Handlebars/Mustache</option>
+            <option value="plain">Plain HTML</option>
+        </select>
+    </div>
+    
+    <div class="form-row" id="template-syntax-row">
+        <label for="node-input-syntax"><i class="fa fa-cogs"></i> Template Syntax</label>
+        <select id="node-input-syntax">
+            <option value="mustache">Mustache {{variable}}</option>
+            <option value="handlebars">Handlebars {{#each}} {{/each}}</option>
+        </select>
+    </div>
+    
+    <div class="form-row">
+        <label for="node-input-field"><i class="fa fa-edit"></i> Template Data</label>
+        <input type="text" id="node-input-field" placeholder="payload" style="width: 60%;">
+        <input type="hidden" id="node-input-fieldType">
+    </div>
+    
+    <div class="form-row">
+        <label for="node-input-output"><i class="fa fa-sign-out"></i> Output</label>
+        <select id="node-input-output">
+            <option value="str">Set msg.template to string</option>
+            <option value="parsed">Set msg.template to parsed object</option>
+        </select>
+    </div>
+    
+    <div class="form-row">
+        <label for="node-input-template"><i class="fa fa-code"></i> Fallback Template</label>
+        <textarea id="node-input-template" rows="4" placeholder="Optional inline template as fallback"></textarea>
+    </div>
+    
+    <div class="form-tips">
+        <p><b>File Template Node</b></p>
+        <p>Loads HTML template content from the filesystem with automatic file watching and reloading.</p>
+        <ul>
+            <li><strong>Template File:</strong> Path to your HTML template file (relative to Node-RED working directory)</li>
+            <li><strong>Template Data:</strong> The message property containing data for template substitution</li>
+            <li><strong>File Watching:</strong> Automatically reloads when the template file changes</li>
+            <li><strong>Mustache Syntax:</strong> Use {{variable}} for simple substitution, {{#each array}} for iteration</li>
+        </ul>
+    </div>
+</script>
+
+<!-- Node Help Text -->
+<script type="text/html" data-help-name="file-template">
+    <p>A Node-RED node that loads HTML template content from the filesystem with automatic file watching and reloading.</p>
+    
+    <h3>Inputs</h3>
+    <dl class="message-properties">
+        <dt>payload <span class="property-type">object</span></dt>
+        <dd>The data object to use for template variable substitution.</dd>
+        
+        <dt class="optional">topic <span class="property-type">string</span></dt>
+        <dd>Optional message topic that gets passed through.</dd>
+    </dl>
+    
+    <h3>Outputs</h3>
+    <dl class="message-properties">
+        <dt>template <span class="property-type">string</span></dt>
+        <dd>The processed template content with variables substituted.</dd>
+        
+        <dt>_fileTemplate <span class="property-type">object</span></dt>
+        <dd>Metadata about the template file including filename, last modified time, and content length.</dd>
+    </dl>
+    
+    <h3>Configuration</h3>
+    <dl>
+        <dt>Template File</dt>
+        <dd>Path to the HTML template file, relative to Node-RED working directory.</dd>
+        
+        <dt>Template Format</dt>
+        <dd>Choose between Handlebars/Mustache for variable substitution or Plain HTML for static content.</dd>
+        
+        <dt>Template Data</dt>
+        <dd>The message property (default: payload) containing the data for template variable substitution.</dd>
+        
+        <dt>Output</dt>
+        <dd>Whether to output the result as a string or attempt to parse it as JSON.</dd>
+        
+        <dt>Fallback Template</dt>
+        <dd>Optional inline template content to use if the file cannot be loaded.</dd>
+    </dl>
+    
+    <h3>Features</h3>
+    <ul>
+        <li><strong>File Watching:</strong> Automatically detects changes to the template file and reloads content</li>
+        <li><strong>Template Processing:</strong> Supports Mustache-style variable substitution ({{variable}})</li>
+        <li><strong>Error Handling:</strong> Graceful handling of missing files with fallback options</li>
+        <li><strong>Status Updates:</strong> Visual status indicators showing file load status and errors</li>
+        <li><strong>Flexible Data Source:</strong> Can pull template data from msg, flow, or global context</li>
+    </ul>
+    
+    <h3>Template Syntax Examples</h3>
+    <p>Simple variable substitution:</p>
+    <pre>
+&lt;h1&gt;{{title}}&lt;/h1&gt;
+&lt;p&gt;Hello {{user.name}}&lt;/p&gt;
+    </pre>
+    
+    <p>With input data:</p>
+    <pre>
+{
+  "title": "My Dashboard",
+  "user": {
+    "name": "John Doe"  
+  }
+}
+    </pre>
+    
+    <p>Results in:</p>
+    <pre>
+&lt;h1&gt;My Dashboard&lt;/h1&gt;
+&lt;p&gt;Hello John Doe&lt;/p&gt;
+    </pre>
+    
+    <h3>Status Indicators</h3>
+    <ul>
+        <li><span style="color: green;">●</span> Green: Template file loaded successfully</li>
+        <li><span style="color: yellow;">●</span> Yellow: Using fallback inline template</li>
+        <li><span style="color: red;">●</span> Red: Error loading file or processing template</li>
+        <li><span style="color: grey;">●</span> Grey: No file specified or node inactive</li>
+    </ul>
+</script> 
