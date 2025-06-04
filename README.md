@@ -26,7 +26,7 @@ npm install node-red-contrib-file-template
 
 ### Manual Installation
 ```bash
-git clone https://github.com/yourusername/node-red-contrib-file-template.git
+git clone https://github.com/danedens/node-red-contrib-file-template.git
 cd node-red-contrib-file-template
 npm install
 npm link
@@ -242,7 +242,7 @@ Pull template data from different contexts:
 
 ### Local Development
 ```bash
-git clone https://github.com/yourusername/node-red-contrib-file-template.git
+git clone https://github.com/danedens/node-red-contrib-file-template.git
 cd node-red-contrib-file-template
 npm install
 npm link
@@ -269,8 +269,8 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 ## Support
 
-- 🐛 **Issues**: [GitHub Issues](https://github.com/yourusername/node-red-contrib-file-template/issues)
-- 💬 **Discussions**: [GitHub Discussions](https://github.com/yourusername/node-red-contrib-file-template/discussions)
+- 🐛 **Issues**: [GitHub Issues](https://github.com/danedens/node-red-contrib-file-template/issues)
+- 💬 **Discussions**: [GitHub Discussions](https://github.com/danedens/node-red-contrib-file-template/discussions)
 - 📧 **Email**: your.email@example.com
 
 ## Related Nodes
