@@ -8,7 +8,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/dedens/node-red-contrib-file-template.git"
+    "url": "git+https://github.com/dedens/node-red-contrib-file-template.git"
   },
   "keywords": [
     "node-red",
@@ -38,4 +38,4 @@
   "engines": {
     "node": ">=12.0.0"
   }
-} 
+}
