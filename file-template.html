@@ -11,7 +11,10 @@
             template: {value: ""},
             field: {value: "payload", required: true},
             fieldType: {value: "msg"},
-            output: {value: "str"}
+            output: {value: "str"},
+            loadOnBoot: {value: false},
+            bootData: {value: "{}"},
+            bootDelay: {value: 1000}
         },
         inputs: 1,
         outputs: 1,
@@ -30,14 +33,14 @@
         },
         oneditprepare: function() {
             var node = this;
-            
+
             // Initialize field type selector
             $("#node-input-fieldType").typedInput({
                 type: "msg",
                 types: ["msg", "flow", "global"],
                 typeField: "#node-input-fieldType"
             });
-            
+
             // File picker button
             $("#node-input-filename-picker").click(function() {
                 // Simple file picker - in real implementation you might want a proper file browser
@@ -46,7 +49,7 @@
                     $("#node-input-filename").val(filename);
                 }
             });
-            
+
             // Template format change handler
             $("#node-input-format").change(function() {
                 var format = $(this).val();
@@ -56,9 +59,25 @@
                     $("#template-syntax-row").hide();
                 }
             });
-            
+
             // Initialize visibility
             $("#node-input-format").trigger('change');
+
+            // Load on boot change handler
+            $("#node-input-loadOnBoot").change(function() {
+                if ($(this).is(':checked')) {
+                    $("#boot-settings-row").show();
+                    $("#boot-data-row").show();
+                    $("#boot-delay-row").show();
+                } else {
+                    $("#boot-settings-row").hide();
+                    $("#boot-data-row").hide();
+                    $("#boot-delay-row").hide();
+                }
+            });
+
+            // Initialize boot settings visibility
+            $("#node-input-loadOnBoot").trigger('change');
         },
         oneditsave: function() {
             // Validate filename
@@ -76,7 +95,7 @@
         <label for="node-input-name"><i class="fa fa-tag"></i> Name</label>
         <input type="text" id="node-input-name" placeholder="Node name">
     </div>
-    
+
     <div class="form-row">
         <label for="node-input-filename"><i class="fa fa-file-o"></i> Template File</label>
         <input type="text" id="node-input-filename" placeholder="path/to/template.html" style="width: calc(100% - 30px);">
@@ -84,7 +103,7 @@
             <i class="fa fa-folder-open"></i>
         </button>
     </div>
-    
+
     <div class="form-row">
         <label for="node-input-format"><i class="fa fa-code"></i> Template Format</label>
         <select id="node-input-format">
@@ -92,7 +111,7 @@
             <option value="plain">Plain HTML</option>
         </select>
     </div>
-    
+
     <div class="form-row" id="template-syntax-row">
         <label for="node-input-syntax"><i class="fa fa-cogs"></i> Template Syntax</label>
         <select id="node-input-syntax">
@@ -100,13 +119,13 @@
             <option value="handlebars">Handlebars {{#each}} {{/each}}</option>
         </select>
     </div>
-    
+
     <div class="form-row">
         <label for="node-input-field"><i class="fa fa-edit"></i> Template Data</label>
         <input type="text" id="node-input-field" placeholder="payload" style="width: 60%;">
         <input type="hidden" id="node-input-fieldType">
     </div>
-    
+
     <div class="form-row">
         <label for="node-input-output"><i class="fa fa-sign-out"></i> Output</label>
         <select id="node-input-output">
@@ -114,10 +133,34 @@
             <option value="parsed">Set msg.template to parsed object</option>
         </select>
     </div>
-    
+
     <div class="form-row">
         <label for="node-input-template"><i class="fa fa-code"></i> Fallback Template</label>
         <textarea id="node-input-template" rows="4" placeholder="Optional inline template as fallback"></textarea>
+    </div>
+
+    <div class="form-row">
+        <label for="node-input-loadOnBoot"><i class="fa fa-power-off"></i> Load on Boot</label>
+        <input type="checkbox" id="node-input-loadOnBoot" style="width: auto; margin: 0;">
+        <span style="margin-left: 10px;">Automatically process template when Node-RED starts</span>
+    </div>
+
+    <div class="form-row" id="boot-settings-row" style="display: none;">
+        <label style="width: 100%; margin-bottom: 5px;"><i class="fa fa-cog"></i> <strong>Boot Settings</strong></label>
+    </div>
+
+    <div class="form-row" id="boot-delay-row" style="display: none;">
+        <label for="node-input-bootDelay"><i class="fa fa-clock-o"></i> Boot Delay (ms)</label>
+        <input type="number" id="node-input-bootDelay" placeholder="1000" min="0" max="30000" style="width: 100px;">
+        <span style="margin-left: 10px; color: #999;">Delay before processing template on startup</span>
+    </div>
+
+    <div class="form-row" id="boot-data-row" style="display: none;">
+        <label for="node-input-bootData"><i class="fa fa-database"></i> Boot Data (JSON)</label>
+        <textarea id="node-input-bootData" rows="3" placeholder='{"title": "Dashboard", "user": "Admin"}' style="font-family: monospace;"></textarea>
+        <span style="display: block; margin-top: 5px; color: #999; font-size: 12px;">
+            JSON data for template variable substitution on boot (e.g., values for {{variable}} placeholders). Use {} for static templates without variables.
+        </span>
     </div>
     
     <div class="form-tips">
@@ -128,6 +171,7 @@
             <li><strong>Template Data:</strong> The message property containing data for template substitution</li>
             <li><strong>File Watching:</strong> Automatically reloads when the template file changes</li>
             <li><strong>Mustache Syntax:</strong> Use {{variable}} for simple substitution, {{#each array}} for iteration</li>
+            <li><strong>Load on Boot:</strong> Automatically processes template when Node-RED starts up</li>
         </ul>
     </div>
 </script>
@@ -170,6 +214,15 @@
         
         <dt>Fallback Template</dt>
         <dd>Optional inline template content to use if the file cannot be loaded.</dd>
+        
+        <dt>Load on Boot</dt>
+        <dd>When enabled, automatically processes the template when Node-RED starts up.</dd>
+        
+        <dt>Boot Delay</dt>
+        <dd>Delay in milliseconds before processing template on startup (default: 1000ms).</dd>
+        
+        <dt>Boot Data</dt>
+        <dd>JSON data for template variable substitution on boot (e.g., values for {{variable}} placeholders). Use {} for static templates without variables.</dd>
     </dl>
     
     <h3>Features</h3>
@@ -179,6 +232,7 @@
         <li><strong>Error Handling:</strong> Graceful handling of missing files with fallback options</li>
         <li><strong>Status Updates:</strong> Visual status indicators showing file load status and errors</li>
         <li><strong>Flexible Data Source:</strong> Can pull template data from msg, flow, or global context</li>
+        <li><strong>Load on Boot:</strong> Automatically processes template when Node-RED starts, eliminating the need for manual trigger flows</li>
     </ul>
     
     <h3>Template Syntax Examples</h3>
