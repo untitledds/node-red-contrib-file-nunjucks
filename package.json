@@ -1,7 +1,7 @@
 {
   "name": "node-red-contrib-file-template",
-  "version": "1.0.1",
-  "description": "A Node-RED node that loads HTML template content from file system, with file watching and dynamic reloading",
+  "version": "1.1.0",
+  "description": "A Node-RED node that loads HTML template content from file system, with file watching, dynamic reloading, and automatic boot processing",
   "main": "file-template.js",
   "scripts": {
     "test": "node test.js"
@@ -12,6 +12,7 @@
   },
   "keywords": [
     "node-red",
+    "ui",
     "template",
     "html",
     "file",

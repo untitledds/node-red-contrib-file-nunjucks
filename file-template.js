@@ -20,6 +20,9 @@ module.exports = function (RED)
         node.fieldType = config.fieldType || "msg";
         node.output = config.output || "str";
         node.name = config.name;
+        node.loadOnBoot = config.loadOnBoot || false;
+        node.bootData = config.bootData || "{}";
+        node.bootDelay = parseInt(config.bootDelay) || 1000;
 
         // File watching
         let watcher = null;
@@ -124,11 +127,60 @@ module.exports = function (RED)
             }
         }
 
+        // Process template on boot
+        function processOnBoot()
+        {
+            if (!node.loadOnBoot) return;
+
+            try
+            {
+                // Parse boot data
+                let bootData = {};
+                if (node.bootData && node.bootData.trim())
+                {
+                    try
+                    {
+                        bootData = JSON.parse(node.bootData);
+                    } catch (e)
+                    {
+                        node.error(`Invalid boot data JSON: ${e.message}`);
+                        bootData = {};
+                    }
+                }
+
+                // Create synthetic message
+                const bootMsg = {
+                    payload: bootData,
+                    topic: "boot",
+                    _bootTriggered: true
+                };
+
+                // Process the message through the normal input handler
+                node.emit('input', bootMsg);
+
+                node.log(`Template processed on boot with data: ${JSON.stringify(bootData)}`);
+
+            } catch (err)
+            {
+                node.error(`Boot processing error: ${err.message}`);
+                updateStatus("Boot error", "red");
+            }
+        }
+
         // Initialize
         if (node.filename)
         {
             loadTemplate();
             setupWatcher();
+
+            // Schedule boot processing if enabled
+            if (node.loadOnBoot)
+            {
+                setTimeout(() =>
+                {
+                    processOnBoot();
+                }, node.bootDelay);
+            }
         } else
         {
             updateStatus("No file specified", "grey");
