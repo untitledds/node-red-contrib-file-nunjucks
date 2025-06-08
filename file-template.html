@@ -31,11 +31,11 @@
         oneditprepare: function() {
             var node = this;
             
-            // Initialize field type selector
-            $("#node-input-fieldType").typedInput({
-                type: "msg",
-                types: ["msg", "flow", "global"],
-                typeField: "#node-input-fieldType"
+            // Initialize field type selector with proper typedInput configuration
+            $("#node-input-field").typedInput({
+                default: 'msg',
+                typeField: $("#node-input-fieldType"),
+                types: ['msg','flow','global']
             });
             
             // File picker button
@@ -103,7 +103,7 @@
     
     <div class="form-row">
         <label for="node-input-field"><i class="fa fa-edit"></i> Template Data</label>
-        <input type="text" id="node-input-field" placeholder="payload" style="width: 60%;">
+        <input type="text" id="node-input-field" placeholder="payload">
         <input type="hidden" id="node-input-fieldType">
     </div>
     
