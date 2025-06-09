@@ -184,8 +184,8 @@
         "id": "comment-3",
         "type": "comment",
         "z": "example-flow",
-        "name": "File Watching: Edit template file and see automatic updates",
-        "info": "This inject runs every 5 seconds. Edit the template file\n(examples/templates/sample-dashboard.html) and watch the output\nupdate automatically when you save changes.",
+        "name": "File Watching: Create your own template file to test auto-reload",
+        "info": "This inject runs every 5 seconds. To test file watching:\n1. Create a template file (e.g., 'my-template.html')\n2. Edit the file-template node to use your file path\n3. Edit the template file and watch output update automatically when you save changes.",
         "x": 280,
         "y": 460,
         "wires": []
