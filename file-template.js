@@ -155,10 +155,17 @@ module.exports = function (RED)
                     _bootTriggered: true
                 };
 
-                // Process the message through the normal input handler
-                node.emit('input', bootMsg);
-
-                node.log(`Template processed on boot with data: ${JSON.stringify(bootData)}`);
+                // Process using internal method
+                const result = processMessage(bootMsg);
+                if (result.error)
+                {
+                    node.error(`Boot processing error: ${result.error.message}`);
+                    updateStatus("Boot error", "red");
+                } else
+                {
+                    node.log(`Template processed on boot with data: ${JSON.stringify(bootData)}`);
+                    updateStatus("Boot complete", "green");
+                }
 
             } catch (err)
             {
@@ -167,38 +174,9 @@ module.exports = function (RED)
             }
         }
 
-        // Initialize
-        if (node.filename)
+        // Internal message processing function
+        function processMessage(msg)
         {
-            loadTemplate();
-            setupWatcher();
-
-            // Schedule boot processing if enabled
-            if (node.loadOnBoot)
-            {
-                setTimeout(() =>
-                {
-                    processOnBoot();
-                }, node.bootDelay);
-            }
-        } else
-        {
-            updateStatus("No file specified", "grey");
-        }
-
-        // Handle incoming messages
-        node.on('input', function (msg, send, done)
-        {
-            // Backwards compatibility
-            send = send || function () { node.send.apply(node, arguments); };
-            done = done || function (error)
-            {
-                if (error)
-                {
-                    node.error(error, msg);
-                }
-            };
-
             try
             {
                 // If no file content, try to load it
@@ -288,8 +266,71 @@ module.exports = function (RED)
                     format: node.format
                 };
 
-                send(msg);
-                done();
+                return { success: true, message: msg };
+
+            } catch (err)
+            {
+                updateStatus("Template error", "red");
+                return { success: false, error: err };
+            }
+        }
+
+        // Initialize
+        if (node.filename)
+        {
+            loadTemplate();
+            setupWatcher();
+
+            // Schedule boot processing if enabled
+            if (node.loadOnBoot)
+            {
+                // Use setImmediate to ensure Node-RED has fully initialized
+                setImmediate(() =>
+                {
+                    setTimeout(() =>
+                    {
+                        // Double-check that the node is still valid and RED is available
+                        if (node && RED && RED.util)
+                        {
+                            processOnBoot();
+                        } else
+                        {
+                            node.warn("Node-RED not fully initialized, skipping boot processing");
+                        }
+                    }, node.bootDelay);
+                });
+            }
+        } else
+        {
+            updateStatus("No file specified", "grey");
+        }
+
+        // Handle incoming messages
+        node.on('input', function (msg, send, done)
+        {
+            // Backwards compatibility
+            send = send || function () { node.send.apply(node, arguments); };
+            done = done || function (error)
+            {
+                if (error)
+                {
+                    node.error(error, msg);
+                }
+            };
+
+            try
+            {
+                // Process using internal method
+                const result = processMessage(msg);
+                if (result.error)
+                {
+                    node.error(`Template processing error: ${result.error.message}`);
+                    done(result.error);
+                } else
+                {
+                    send(result.message);
+                    done();
+                }
 
             } catch (err)
             {
