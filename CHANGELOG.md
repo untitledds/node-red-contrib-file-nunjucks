@@ -5,7 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.1.2] - 2025-01-07
+## [1.1.4] - 2025-01-09
+
+### Removed
+- **Example Files**: Completely removed examples directory and all references to example template files
+  - Eliminated source of installation issues where users tried to import non-existent example flows
+  - Updated test.js to use inline template instead of external file references
+  - Cleaner package with no unnecessary example files that could cause confusion
+
+### Changed
+- **Testing**: test.js now uses inline template for testing instead of external file
+- **Package Size**: Smaller package without example files
+
+## [1.1.3] - 2025-01-07
 
 ### Fixed - Example Flow Issues
 - **Broken Example Template**: Fixed example flow that referenced non-existent template file
@@ -16,6 +28,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - **Example Flow**: Main example now uses safe inline template instead of external file reference
 - **User Experience**: Example works immediately after import without requiring external files
+
+## [1.1.2] - 2025-01-07
+
+### Fixed - Critical Boot Processing Bug
+- **Load on Boot Crash**: Fixed Node-RED server crash when "Load on Boot" option was enabled
+  - Issue: `node.emit('input', bootMsg)` was missing required `send` and `done` callback parameters
+  - Solution: Refactored to use internal `processMessage()` function shared by both input handler and boot processing
+  - Added safety checks to ensure Node-RED is fully initialized before boot processing
+  - Improved error handling with proper status updates for boot operations
+
+### Technical Details
+- Eliminated unsafe `node.emit('input')` call that caused missing callback parameters
+- Created shared `processMessage()` function for consistent template processing
+- Added `setImmediate()` + `setTimeout()` for proper initialization timing
+- Enhanced boot error reporting with detailed status indicators
+- Maintains full functionality while preventing server crashes
+
+### Changed
+- Refactored internal message processing architecture
+- Improved boot timing with dual-stage initialization check
+- Enhanced error handling and logging for boot operations
 
 ## [1.1.1] - 2025-01-07
 

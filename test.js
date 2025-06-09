@@ -48,11 +48,29 @@ fileTemplateNode(mockRED);
 
 // Test configuration
 const testConfig = {
-    filename: 'examples/templates/sample-dashboard.html',
+    filename: '', // No file - will use inline template for testing
     format: 'handlebars',
     field: 'payload',
     fieldType: 'msg',
-    output: 'str'
+    output: 'str',
+    template: `
+<div class="test-dashboard">
+    <h1>{{title}}</h1>
+    <h2>{{subtitle}}</h2>
+    <div class="stats">
+        <p>Total: {{stats.total}}</p>
+        <p>Completed: {{stats.completed}}</p>
+        <p>Progress: {{stats.progress}}%</p>
+    </div>
+    <div class="user-info">
+        <p>User: {{user.name}} ({{user.role}})</p>
+        <p>Email: {{user.email}}</p>
+    </div>
+    <div class="project-info">
+        <p>Project: {{project.name}}</p>
+        <p>Status: {{project.status}}</p>
+    </div>
+</div>`
 };
 
 console.log('Testing node-red-contrib-file-template...\n');
@@ -102,48 +120,42 @@ const testMessage = {
 console.log('Test message:', JSON.stringify(testMessage, null, 2));
 console.log('\n--- Test Results ---');
 
-// Verify template file exists
-if (fs.existsSync(testConfig.filename))
+// Test inline template processing since we're not using external files
+console.log('✅ Using inline template for testing');
+
+const templateContent = testConfig.template;
+console.log('✅ Template loaded successfully');
+console.log('Template size:', templateContent.length, 'characters');
+
+// Simple template processing test (basic mustache replacement)
+let processedTemplate = templateContent;
+const data = testMessage.payload;
+
+// Basic mustache-style replacement
+processedTemplate = processedTemplate.replace(/\{\{([^}]+)\}\}/g, function (match, key)
 {
-    console.log('✅ Template file exists:', testConfig.filename);
+    const keys = key.trim().split('.');
+    let value = data;
 
-    // Read and show template preview
-    const templateContent = fs.readFileSync(testConfig.filename, 'utf8');
-    console.log('✅ Template loaded successfully');
-    console.log('Template size:', templateContent.length, 'characters');
-
-    // Simple template processing test (basic mustache replacement)
-    let processedTemplate = templateContent;
-    const data = testMessage.payload;
-
-    // Basic mustache-style replacement
-    processedTemplate = processedTemplate.replace(/\{\{([^}]+)\}\}/g, function (match, key)
+    for (let k of keys)
     {
-        const keys = key.trim().split('.');
-        let value = data;
-
-        for (let k of keys)
+        if (value && typeof value === 'object' && k in value)
         {
-            if (value && typeof value === 'object' && k in value)
-            {
-                value = value[k];
-            } else
-            {
-                return match; // Return original if key not found
-            }
+            value = value[k];
+        } else
+        {
+            return match; // Return original if key not found
         }
+    }
 
-        return value !== null && value !== undefined ? value : '';
-    });
+    return value !== null && value !== undefined ? value : '';
+});
 
-    console.log('✅ Template processing test passed');
-    console.log('Processed template preview (first 200 chars):');
-    console.log(processedTemplate.substring(0, 200) + '...');
-
-} else
-{
-    console.log('❌ Template file not found:', testConfig.filename);
-}
+console.log('✅ Template processing test passed');
+console.log('Processed template preview:');
+console.log('--- START TEMPLATE OUTPUT ---');
+console.log(processedTemplate);
+console.log('--- END TEMPLATE OUTPUT ---');
 
 console.log('\n--- Installation Instructions ---');
 console.log('To use this node in Node-RED:');
