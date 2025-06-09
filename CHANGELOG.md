@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.2] - 2025-01-07
+
+### Fixed - Example Flow Issues
+- **Broken Example Template**: Fixed example flow that referenced non-existent template file
+  - Issue: Example flow used `"examples/templates/sample-dashboard.html"` which doesn't exist in user installations
+  - Solution: Converted to inline template that works immediately after import
+  - Users can now import and use the example flow without crashes or missing file errors
+
+### Changed
+- **Example Flow**: Main example now uses safe inline template instead of external file reference
+- **User Experience**: Example works immediately after import without requiring external files
+
 ## [1.1.1] - 2025-01-07
 
 ### Fixed - Critical Boot Processing Bug
