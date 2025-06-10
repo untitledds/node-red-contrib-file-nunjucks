@@ -5,7 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.1.4] - 2025-01-09
+## [1.1.4] - 2025-06-09
+
+### Added
+
+- **File Editor Interface**: Added a built-in text editor for template content in the node configuration
+- **Load File Button**: Click to populate the editor with current file content
+- **Save to File Button**: Write editor changes directly back to the filesystem
+- **Auto-load Functionality**: File content automatically loads when filename is specified
+- **Real-time File Info**: Shows file size, modification time, and status updates
+- **Content Preview**: See template content without leaving the Node-RED editor
+
+### Enhanced
+
+- **Better UX**: Edit template files without switching between Node-RED and external editors
+- **Safety Features**: Confirmation dialog before overwriting files
+- **Status Feedback**: Clear status messages for load/save operations
+- **Monospace Editor**: Proper code formatting with syntax highlighting-ready interface
+
+### Technical
+
+- Added HTTP endpoints: `/file-template/load-file` and `/file-template/save-file`
+- Enhanced configuration UI with responsive textarea editor
+- Improved error handling for file operations
+
+## [1.1.3] - 2025-06-07
 
 ### Removed
 - **Example Files**: Completely removed examples directory and all references to example template files
@@ -16,18 +40,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - **Testing**: test.js now uses inline template for testing instead of external file
 - **Package Size**: Smaller package without example files
-
-## [1.1.3] - 2025-01-07
-
-### Fixed - Example Flow Issues
-- **Broken Example Template**: Fixed example flow that referenced non-existent template file
-  - Issue: Example flow used `"examples/templates/sample-dashboard.html"` which doesn't exist in user installations
-  - Solution: Converted to inline template that works immediately after import
-  - Users can now import and use the example flow without crashes or missing file errors
-
-### Changed
-- **Example Flow**: Main example now uses safe inline template instead of external file reference
-- **User Experience**: Example works immediately after import without requiring external files
 
 ## [1.1.2] - 2025-01-07
 

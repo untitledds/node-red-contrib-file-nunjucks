@@ -14,7 +14,8 @@
             output: {value: "str"},
             loadOnBoot: {value: false},
             bootData: {value: "{}"},
-            bootDelay: {value: 1000}
+            bootDelay: {value: 1000},
+            fileContent: {value: ""}
         },
         inputs: 1,
         outputs: 1,
@@ -50,6 +51,108 @@
                 }
             });
 
+            // NEW: Load file content functionality
+            function updateFileStatus(message, isError = false) {
+                $("#file-content-status").text(message);
+                $("#file-content-status").css('color', isError ? '#d32f2f' : '#666');
+            }
+
+            function updateFileInfo(info) {
+                $("#file-content-info").text(info);
+            }
+
+            // Load file content button
+            $("#node-input-load-file-btn").click(function() {
+                var filename = $("#node-input-filename").val().trim();
+                if (!filename) {
+                    updateFileStatus("Please specify a template file first", true);
+                    return;
+                }
+
+                updateFileStatus("Loading file...");
+                
+                // Make AJAX request to load file content
+                $.ajax({
+                    url: 'file-template/load-file',
+                    type: 'POST',
+                    data: JSON.stringify({ filename: filename }),
+                    contentType: 'application/json',
+                    success: function(data) {
+                        if (data.error) {
+                            updateFileStatus("Error: " + data.error, true);
+                        } else {
+                            $("#node-input-fileContent").val(data.content);
+                            updateFileStatus("File loaded successfully");
+                            updateFileInfo(`${data.size} chars, modified: ${new Date(data.mtime).toLocaleString()}`);
+                        }
+                    },
+                    error: function(xhr, status, error) {
+                        updateFileStatus("Failed to load file: " + error, true);
+                    }
+                });
+            });
+
+            // Save file content button
+            $("#node-input-save-file-btn").click(function() {
+                var filename = $("#node-input-filename").val().trim();
+                var content = $("#node-input-fileContent").val();
+                
+                if (!filename) {
+                    updateFileStatus("Please specify a template file first", true);
+                    return;
+                }
+
+                if (!content) {
+                    updateFileStatus("No content to save", true);
+                    return;
+                }
+
+                if (!confirm("Are you sure you want to save the changes to the file?\n\nThis will overwrite: " + filename)) {
+                    return;
+                }
+
+                updateFileStatus("Saving file...");
+                
+                // Make AJAX request to save file content
+                $.ajax({
+                    url: 'file-template/save-file',
+                    type: 'POST',
+                    data: JSON.stringify({ 
+                        filename: filename, 
+                        content: content 
+                    }),
+                    contentType: 'application/json',
+                    success: function(data) {
+                        if (data.error) {
+                            updateFileStatus("Error: " + data.error, true);
+                        } else {
+                            updateFileStatus("File saved successfully");
+                            updateFileInfo(`${data.size} chars saved`);
+                        }
+                    },
+                    error: function(xhr, status, error) {
+                        updateFileStatus("Failed to save file: " + error, true);
+                    }
+                });
+            });
+
+            // Auto-load file content when filename changes
+            $("#node-input-filename").on('blur', function() {
+                var filename = $(this).val().trim();
+                if (filename && filename !== node.filename) {
+                    // Auto-load if file content is empty
+                    if (!$("#node-input-fileContent").val().trim()) {
+                        $("#node-input-load-file-btn").click();
+                    }
+                }
+            });
+
+            // Initialize file content if already stored
+            if (node.fileContent) {
+                $("#node-input-fileContent").val(node.fileContent);
+                updateFileStatus("Content loaded from configuration");
+            }
+
             // Template format change handler
             $("#node-input-format").change(function() {
                 var format = $(this).val();
@@ -80,6 +183,9 @@
             $("#node-input-loadOnBoot").trigger('change');
         },
         oneditsave: function() {
+            // Save file content to node configuration
+            this.fileContent = $("#node-input-fileContent").val();
+            
             // Validate filename
             var filename = $("#node-input-filename").val().trim();
             if (!filename) {
@@ -102,6 +208,24 @@
         <button type="button" id="node-input-filename-picker" class="editor-button" style="width: 25px; margin-left: 5px;">
             <i class="fa fa-folder-open"></i>
         </button>
+    </div>
+
+    <!-- NEW: File Content Editor -->
+    <div class="form-row">
+        <label for="node-input-fileContent" style="width: 100%;"><i class="fa fa-edit"></i> Template Content 
+            <button type="button" id="node-input-load-file-btn" class="editor-button" style="float: right; margin-top: -3px;">
+                <i class="fa fa-refresh"></i> Load File
+            </button>
+            <button type="button" id="node-input-save-file-btn" class="editor-button" style="float: right; margin-right: 5px; margin-top: -3px;">
+                <i class="fa fa-save"></i> Save to File
+            </button>
+        </label>
+        <textarea id="node-input-fileContent" rows="12" placeholder="File content will appear here..." 
+                  style="font-family: monospace; font-size: 12px; width: 100%; resize: vertical;"></textarea>
+        <div style="margin-top: 5px; color: #666; font-size: 11px;">
+            <span id="file-content-status">Select a file and click "Load File" to edit content</span>
+            <span style="float: right;" id="file-content-info"></span>
+        </div>
     </div>
 
     <div class="form-row">
@@ -168,6 +292,7 @@
         <p>Loads HTML template content from the filesystem with automatic file watching and reloading.</p>
         <ul>
             <li><strong>Template File:</strong> Path to your HTML template file (relative to Node-RED working directory)</li>
+            <li><strong>Template Content:</strong> Edit file content directly in the editor with load/save functionality</li>
             <li><strong>Template Data:</strong> The message property containing data for template substitution</li>
             <li><strong>File Watching:</strong> Automatically reloads when the template file changes</li>
             <li><strong>Mustache Syntax:</strong> Use {{variable}} for simple substitution, {{#each array}} for iteration</li>
@@ -179,6 +304,24 @@
 <!-- Node Help Text -->
 <script type="text/html" data-help-name="file-template">
     <p>A Node-RED node that loads HTML template content from the filesystem with automatic file watching and reloading.</p>
+
+    <h3>Features</h3>
+    <ul>
+        <li><strong>File Editing:</strong> Load, edit, and save template files directly in the Node-RED editor</li>
+        <li><strong>Live Preview:</strong> See file content and modifications before deployment</li>
+        <li><strong>Auto-reload:</strong> Changes to files are automatically detected and reloaded</li>
+        <li><strong>Template Processing:</strong> Supports Handlebars/Mustache syntax for dynamic content</li>
+        <li><strong>Boot Processing:</strong> Can automatically process templates when Node-RED starts</li>
+    </ul>
+
+    <h3>File Editor</h3>
+    <p>The Template Content editor allows you to:</p>
+    <ul>
+        <li><strong>Load File:</strong> Click "Load File" to populate the editor with the current file content</li>
+        <li><strong>Edit Content:</strong> Modify the template directly in the monospace editor</li>
+        <li><strong>Save Changes:</strong> Click "Save to File" to write your changes back to the filesystem</li>
+        <li><strong>Auto-load:</strong> Content is automatically loaded when you specify a filename</li>
+    </ul>
 
     <h3>Inputs</h3>
     <dl class="message-properties">

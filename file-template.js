@@ -353,4 +353,81 @@ module.exports = function (RED)
 
     // Register the node
     RED.nodes.registerType("file-template", FileTemplateNode);
+
+    // NEW: HTTP endpoints for file editing functionality
+    RED.httpAdmin.post('/file-template/load-file', function (req, res)
+    {
+        const filename = req.body.filename;
+
+        if (!filename)
+        {
+            return res.json({ error: 'No filename provided' });
+        }
+
+        try
+        {
+            const fullPath = path.resolve(filename);
+
+            // Check if file exists
+            if (!fs.existsSync(fullPath))
+            {
+                return res.json({ error: `File not found: ${filename}` });
+            }
+
+            // Read file content and stats
+            const content = fs.readFileSync(fullPath, 'utf8');
+            const stats = fs.statSync(fullPath);
+
+            res.json({
+                content: content,
+                size: content.length,
+                mtime: stats.mtime.getTime(),
+                filename: filename
+            });
+
+        } catch (err)
+        {
+            res.json({ error: `Error reading file: ${err.message}` });
+        }
+    });
+
+    RED.httpAdmin.post('/file-template/save-file', function (req, res)
+    {
+        const { filename, content } = req.body;
+
+        if (!filename)
+        {
+            return res.json({ error: 'No filename provided' });
+        }
+
+        if (content === undefined)
+        {
+            return res.json({ error: 'No content provided' });
+        }
+
+        try
+        {
+            const fullPath = path.resolve(filename);
+
+            // Ensure directory exists
+            const dir = path.dirname(fullPath);
+            if (!fs.existsSync(dir))
+            {
+                fs.mkdirSync(dir, { recursive: true });
+            }
+
+            // Write file content
+            fs.writeFileSync(fullPath, content, 'utf8');
+
+            res.json({
+                success: true,
+                size: content.length,
+                filename: filename
+            });
+
+        } catch (err)
+        {
+            res.json({ error: `Error writing file: ${err.message}` });
+        }
+    });
 }; 
