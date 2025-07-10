@@ -1,0 +1,338 @@
+<script type="text/javascript">
+    function getNunjucksSnippets() {
+        return [
+            { label: "block", insertText: "{% block ${1:name} %}\n\t$2\n{% endblock %}" },
+            { label: "extends", insertText: '{% extends "${1:base.md}" %}$2' },
+            { label: "include", insertText: '{% include "${1:partial.md}" %}' },
+            { label: "for", insertText: "{% for ${1:item} in ${2:list} %}\n\t$3\n{% endfor %}" },
+            { label: "if", insertText: "{% if ${1:condition} %}\n\t$2\n{% endif %}" },
+            { label: "variable", insertText: "{{ ${1:variable} }}" },
+            { label: "filter", insertText: "| ${1:filter}" },
+            { label: "comment", insertText: "{# $1 #}" },
+            { label: "now", insertText: "{{ now | formatDate }}" },
+            { label: "markdown", insertText: "<!-- markdown -->\n# ${1:Title}" }
+        ].map(snippet => ({
+            ...snippet,
+            kind: monaco.languages.CompletionItemKind.Snippet,
+            insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet
+        }));
+    }
+
+    if (RED.editor.codeEditor.settings && RED.editor.codeEditor.settings.lib === "monaco") {
+        monaco.languages.registerCompletionItemProvider("twig", {
+            provideCompletionItems: () => ({ suggestions: getNunjucksSnippets() })
+        });
+    }
+
+    RED.nodes.registerType("file-nunjucks", {
+        category: "template",
+        color: "#d0e2d0",
+        icon: "nunjucks.png",
+        paletteLabel: "File Nunjucks",
+        defaults: {
+            filename: { value: "", required: false },
+            engine: { value: "nunjucks", required: true },
+            template: { value: "" },
+            field: { value: "payload" },
+            fieldType: { value: "msg" },
+            output: { value: "str" },
+            watchMode: { value: true },
+            cacheTemplates: { value: false },
+            sandbox: { value: true },
+            customFilters: { value: "{}" },
+            markdownMode: { value: false },
+            restrictedProps: { value: "__proto__,constructor" },
+            preProcessHook: { value: "" },
+            postProcessHook: { value: "" },
+            debounceTime: { value: 500 }
+        },
+        inputs: 1,
+        outputs: 1,
+        label: function () {
+            return this.name || "Nunjucks Template";
+        },
+        oneditprepare: function () {
+            // Создаем редактор кода
+            this.editor = RED.editor.createEditor({
+                id: "node-input-template",
+                mode: "ace/mode/twig",
+                value: this.template
+            });
+
+            // Настройка переключателей
+            $("#node-input-watchMode").prop("checked", this.watchMode);
+            $("#node-input-cacheTemplates").prop("checked", this.cacheTemplates);
+            $("#node-input-sandbox").prop("checked", this.sandbox);
+            $("#node-input-markdownMode").prop("checked", this.markdownMode);
+            $("#node-input-debounceTime").val(this.debounceTime || 500);
+            $("#node-input-restrictedProps").val(this.restrictedProps || "__proto__,constructor");
+            $("#node-input-customFilters").val(this.customFilters || "{}");
+            $("#node-input-preProcessHook").val(this.preProcessHook || "");
+            $("#node-input-postProcessHook").val(this.postProcessHook || "");
+
+            // Валидация JSON
+            $("#node-input-check-filters").on("click", function () {
+                try {
+                    JSON.parse($("#node-input-customFilters").val());
+                    alert("Custom filters JSON is valid");
+                } catch (e) {
+                    alert("Invalid JSON: " + e.message);
+                }
+            });
+
+            // Пример Markdown
+            $("#node-input-markdown-example").on("click", function () {
+                const example = `<!-- markdown -->
+# {{ title }}
+
+{% for item in items %}
+- **{{ item.name }}**: {{ item.description }}
+{% endfor %}`;
+                this.editor.setValue(example);
+            }.bind(this));
+
+            // Пример фильтра
+            $("#node-input-filter-example").on("click", function () {
+                const example = '{"uppercase":"function(str){return str.toUpperCase();}"}';
+                $("#node-input-customFilters").val(example);
+            });
+        },
+        oneditsave: function () {
+            this.template = this.editor.getValue();
+            this.watchMode = $("#node-input-watchMode").is(":checked");
+            this.cacheTemplates = $("#node-input-cacheTemplates").is(":checked");
+            this.sandbox = $("#node-input-sandbox").is(":checked");
+            this.markdownMode = $("#node-input-markdownMode").is(":checked");
+            this.debounceTime = parseInt($("#node-input-debounceTime").val()) || 500;
+            this.restrictedProps = $("#node-input-restrictedProps").val();
+            this.customFilters = $("#node-input-customFilters").val();
+            this.preProcessHook = $("#node-input-preProcessHook").val();
+            this.postProcessHook = $("#node-input-postProcessHook").val();
+
+            this.editor.destroy();
+            delete this.editor;
+        },
+        oneditcancel: function () {
+            this.editor.destroy();
+            delete this.editor;
+        }
+    });
+</script>
+
+<script type="text/html" data-template-name="file-nunjucks">
+    <div class="form-row">
+        <label for="node-input-filename"><i class="fa fa-file-text"></i> Template File</label>
+        <input type="text" id="node-input-filename" placeholder="path/to/template.njk">
+    </div>
+
+    <div class="form-row">
+        <label for="node-input-engine">Template Engine</label>
+        <select id="node-input-engine" style="width: 70%;">
+            <option value="nunjucks">Nunjucks (Jinja2)</option>
+            <option value="mustache">Mustache</option>
+            <option value="handlebars">Handlebars</option>
+        </select>
+    </div>
+
+    <div class="form-row">
+        <label for="node-input-field">Data Source Field</label>
+        <input type="text" id="node-input-field" placeholder="payload">
+        <select id="node-input-fieldType" style="width: 30%;">
+            <option value="msg">msg</option>
+            <option value="flow">flow</option>
+            <option value="global">global</option>
+        </select>
+    </div>
+
+    <div class="form-row">
+        <label for="node-input-output">Output Format</label>
+        <select id="node-input-output">
+            <option value="str">String</option>
+            <option value="parsed">Parsed JSON</option>
+        </select>
+    </div>
+
+    <div class="form-row">
+        <label for="node-input-name"><i class="fa fa-tag"></i> Name</label>
+        <input type="text" id="node-input-name" placeholder="Node Name">
+    </div>
+
+    <div class="form-row">
+        <label for="node-input-watchMode">
+            <input type="checkbox" id="node-input-watchMode" style="display: inline-block; width: auto;">
+            Watch for file changes
+        </label>
+    </div>
+
+    <div class="form-row">
+        <label for="node-input-cacheTemplates">
+            <input type="checkbox" id="node-input-cacheTemplates" style="display: inline-block; width: auto;">
+            Cache templates (improves performance)
+        </label>
+    </div>
+
+    <div class="form-row">
+        <label for="node-input-sandbox">
+            <input type="checkbox" id="node-input-sandbox" style="display: inline-block; width: auto;">
+            Enable sandbox mode (recommended)
+        </label>
+    </div>
+
+    <div class="form-row">
+        <label for="node-input-markdownMode">
+            <input type="checkbox" id="node-input-markdownMode" style="display: inline-block; width: auto;">
+            Render result as Markdown → HTML
+        </label>
+    </div>
+
+    <div class="form-row">
+        <label for="node-input-debounceTime">Debounce Time (ms)</label>
+        <input type="number" id="node-input-debounceTime" value="500" min="100" max="5000" step="100">
+    </div>
+
+    <div class="form-row">
+        <label for="node-input-restrictedProps">Restricted Properties</label>
+        <input type="text" id="node-input-restrictedProps" placeholder="__proto__, constructor" />
+    </div>
+
+    <div class="form-row">
+        <label for="node-input-customFilters">
+            <i class="fa fa-filter"></i> Custom Filters (JSON)
+            <a href="#" id="node-input-filter-example" style="margin-left: 10px;">
+                <i class="fa fa-code"></i> Example
+            </a>
+            <a href="#" id="node-input-check-filters" style="margin-left: 10px;">
+                <i class="fa fa-check"></i> Validate
+            </a>
+        </label>
+        <textarea id="node-input-customFilters" rows="3" style="width: 100%; font-family: monospace;"></textarea>
+    </div>
+
+    <div class="form-row">
+        <label for="node-input-preProcessHook">Pre-process Hook</label>
+        <textarea id="node-input-preProcessHook" rows="3" style="width: 100%; font-family: monospace;"
+                  placeholder="function(template, data) { return { template, data }; }"></textarea>
+    </div>
+
+    <div class="form-row">
+        <label for="node-input-postProcessHook">Post-process Hook</label>
+        <textarea id="node-input-postProcessHook" rows="3" style="width: 100%; font-family: monospace;"
+                  placeholder="function(result) { return result; }"></textarea>
+    </div>
+
+    <div class="form-row">
+        <label>Template Content <small>(used if no file specified)</small></label>
+        <div style="height: 300px; position: relative;" class="node-text-editor" id="node-input-template"></div>
+        <button id="node-input-markdown-example" class="editor-button" style="margin-top: 5px;">
+            <i class="fa fa-markdown"></i> Insert Markdown Example
+        </button>
+    </div>
+</script>
+<script type="text/html" data-help-name="file-nunjucks">
+    <p>Render templates using Nunjucks, Mustache or Handlebars with advanced features including file watching, Markdown rendering, sandboxed execution and customizable filters.</p>
+
+    <h3>Features</h3>
+    <ul>
+        <li><strong>Multiple Template Engines</strong>: Nunjucks (full Jinja2-style), Mustache, Handlebars</li>
+        <li><strong>File-based Templates</strong> with automatic reloading on change (<code>watchMode</code>)</li>
+        <li><strong>Inline Templates</strong> for quick use without external files</li>
+        <li><strong>Markdown Support</strong> via <code>marked.js</code>, either by file extension <code>.md</code> or comment <code><!-- markdown --></code></li>
+        <li><strong>Sandbox Mode</strong> to restrict access to sensitive properties like <code>__proto__</code>, <code>constructor</code>, and prevent object mutation</li>
+        <li><strong>Custom Filters</strong> defined via JSON configuration (supports dynamic functions)</li>
+        <li><strong>Lifecycle Hooks</strong>: Pre-process and post-process hooks for template manipulation before and after rendering</li>
+        <li><strong>Template Caching</strong> using LRU cache to improve performance</li>
+        <li><strong>Debounce File Watching</strong> to avoid excessive reloads during rapid edits</li>
+        <li><strong>Secure Path Handling</strong>: Prevents path traversal and restricts access outside working directory</li>
+        <li><strong>LRU Environment Caching</strong> for compiled environments to reduce overhead</li>
+        <li><strong>Output Formats</strong>: Return as raw string or attempt parsing as JSON</li>
+    </ul>
+
+    <h3>Usage</h3>
+    <ol>
+        <li>Select a template engine: Nunjucks (recommended), Mustache, or Handlebars</li>
+        <li>Specify the source of your data via <code>msg.payload</code>, <code>flow</code>, or <code>global</code></li>
+        <li>Choose to load from an external file or provide inline template content</li>
+        <li>Enable <strong>Watch Mode</strong> to auto-reload when the file changes</li>
+        <li>Use <strong>Cache Templates</strong> to speed up repeated rendering</li>
+        <li>Enable <strong>Sandbox Mode</strong> to protect against prototype pollution and unsafe property access</li>
+        <li>Add <strong>Custom Filters</strong> via JSON to extend template logic (e.g. date formatting, default values, transformations)</li>
+        <li>Optionally enable <strong>Markdown Rendering</strong> to output HTML directly in Node-RED Dashboard</li>
+        <li>Use <strong>Pre/Post Process Hooks</strong> to modify templates or results dynamically</li>
+        <li>Processed result is available in <code>msg.template</code></li>
+    </ol>
+
+    <h3>Examples</h3>
+
+    <h4>1. Nunjucks Template (with inheritance)</h4>
+    <pre><code>{% extends "base.md" %}
+{% block content %}
+# {{ title }}
+- User: {{ user.name | uppercase }}
+- Time: {{ now | formatDate("YYYY-MM-DD HH:mm:ss") }}
+
+Tags:
+{% for tag in tags %}
+- {{ tag }}
+{% endfor %}
+{% endblock %}</code></pre>
+
+    <h4>2. Mustache Template</h4>
+    <pre><code># {{ title }}
+- Total: {{ stats.total }}
+- Completed: {{ stats.completed }}
+- Progress: {{ stats.progress }}%</code></pre>
+
+    <h4>3. Markdown Template</h4>
+    <pre><code><!-- markdown -->
+# {{ title }}
+
+User: {{ user.name }}
+Time: {{ now | formatDate }}
+
+{% if project %}
+Project: {{ project.name }}
+Status: {{ project.status }}
+{% endif %}</code></pre>
+
+    <h4>4. Custom Filters (JSON)</h4>
+    <pre><code>{"uppercase": "function(str) { return str.toUpperCase(); }", "default": "function(val, def) { return val !== undefined ? val : def; }"}</code></pre>
+
+    <h4>5. Sample Input Message</h4>
+    <pre><code>{
+  "title": "Weekly Report",
+  "user": {
+    "name": "John Doe"
+  },
+  "stats": {
+    "total": 100,
+    "completed": 84
+  },
+  "tags": ["dev", "admin"],
+  "project": {
+    "name": "Dashboard v2",
+    "status": "In Progress"
+  }
+}</code></pre>
+
+    <h3>Security</h3>
+    <p>The node includes several security measures:</p>
+    <ul>
+        <li>Restricts access to <code>__proto__</code>, <code>constructor</code>, and other internal properties</li>
+        <li>Disables dangerous globals like <code>console</code>, <code>require</code>, and <code>process</code> in sandbox mode</li>
+        <li>Blocks file paths outside working directory</li>
+        <li>Uses deep cloning and Proxy to isolate template data</li>
+    </ul>
+
+    <h3>Performance</h3>
+    <ul>
+        <li>LRU caching for compiled templates and environments</li>
+        <li>Debounced file watching for frequent edits</li>
+    </ul>
+
+    <h3>Advanced Options</h3>
+    <ul>
+        <li><strong>Restricted Properties</strong>: List of keys that should be excluded from template context</li>
+        <li><strong>Debounce Time</strong>: Delay before reloading modified templates</li>
+        <li><strong>Pre/Post Process Hooks</strong>: JavaScript snippets to manipulate template or output before/after rendering</li>
+    </ul>
+</script>

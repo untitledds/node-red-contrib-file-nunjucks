@@ -1,72 +1,78 @@
-# node-red-contrib-file-template
+# node-red-contrib-file-nunjucks
 
-A Node-RED node that loads HTML template content from the filesystem with automatic file watching and reloading, perfect for managing large template files externally.
+**A powerful Node-RED node for rendering Nunjucks (Jinja2-style) templates from files or inline, with support for inheritance, blocks, filters and Markdown.**
 
-## Features
+## ✨ Features
 
-- 📁 **File-based Templates**: Load HTML templates from the filesystem instead of embedding them in flows
-- 🔄 **Auto-reload**: Automatically watches template files for changes and reloads content
-- 🎯 **Mustache Support**: Built-in support for Mustache/Handlebars-style variable substitution
+- 📁 **File-based Templates**: Load Nunjucks/Markdown templates from the filesystem
+- 🔄 **Auto-reload**: Watches template files and reloads on changes
+- 🧩 **Template Inheritance**: Full support for `{% extends %}` and `{% block %}`
+- 🧮 **Logic Support**: If statements, loops, macros, async tags
+- 🎯 **Multiple Engines**: Choose between Mustache, Handlebars or Nunjucks
 - 📊 **Status Indicators**: Visual feedback on file load status and errors
-- 🛡️ **Error Handling**: Graceful fallback to inline templates when files are unavailable
-- ⚡ **Performance**: Only reloads files when they actually change (based on modification time)
+- 🛡️ **Error Handling**: Fallback to inline templates when files are unavailable
+- ⚙️ **Editor Integration**: Snippets & autocomplete in Node-RED editor
+- 📝 **Markdown Ready**: Output remains as Markdown if needed
+- ⚡ **Performance**: Efficient caching and change detection
 
-## Installation
+---
+
+## 🔧 Installation
 
 ### Via Node-RED Palette Manager
 1. Go to Node-RED settings → Manage Palette → Install
-2. Search for `node-red-contrib-file-template`
+2. Search for `node-red-contrib-file-nunjucks`
 3. Click Install
 
 ### Via npm
 ```bash
 cd ~/.node-red
-npm install node-red-contrib-file-template
+npm install node-red-contrib-file-nunjucks
 ```
 
 ### Manual Installation
 ```bash
-git clone https://github.com/danedens/node-red-contrib-file-template.git
-cd node-red-contrib-file-template
+git clone https://github.com/untitledds/node-red-contrib-file-nunjucks.git  
+cd node-red-contrib-file-nunjucks
 npm install
 npm link
 cd ~/.node-red
-npm link node-red-contrib-file-template
+npm link node-red-contrib-file-nunjucks
 ```
 
-## Usage
+> ⚠️ Make sure you have installed `nunjucks`:
+```bash
+npm install nunjucks
+```
+
+---
+
+## 💡 Usage
 
 ### Basic Usage
 
-1. Drag the **file-template** node from the function category into your flow
+1. Drag the **File Nunjucks** node into your flow (under the `template` category)
 2. Double-click to configure:
-   - **Template File**: Path to your HTML template file (e.g., `templates/dashboard.html`)
-   - **Template Data**: Message property containing data for substitution (default: `payload`)
-   - **Template Format**: Choose Handlebars/Mustache for variable substitution or Plain HTML
+   - **Template File**: Path to your `.md` or `.njk` file (e.g., `templates/incident.njk`)
+   - **Engine**: Choose: `mustache`, `handlebars`, or `nunjucks`
+   - **Data Source**: Message property containing data (default: `payload`)
+   - **Output Format**: Set `msg.template` as `string` or `parsed JSON` (if applicable)
+
 3. Connect your data source to the input
-4. Connect the output to a dashboard template node or HTTP response
+4. Use output in Dashboard, Email, Debug, etc.
 
-### Configuration Options
+---
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| **Name** | Node display name | (auto-generated) |
-| **Template File** | Path to template file relative to Node-RED working directory | *required* |
-| **Template Format** | `handlebars` for variable substitution, `plain` for static HTML | `handlebars` |
-| **Template Data** | Message property containing template data | `payload` |
-| **Output** | Set `msg.template` as `string` or `parsed` object | `str` |
-| **Fallback Template** | Optional inline template if file loading fails | (empty) |
-
-### Example Flow
+## 📄 Example Flow
 
 ```json
 [
     {
-        "id": "template-node",
-        "type": "file-template",
-        "name": "Dashboard Template",
-        "filename": "templates/TodoList.html",
-        "format": "handlebars",
+        "id": "nunjucks-node",
+        "type": "file-nunjucks",
+        "name": "Incident Report",
+        "filename": "templates/incident.njk",
+        "engine": "nunjucks",
         "field": "payload",
         "fieldType": "msg",
         "output": "str"
@@ -74,74 +80,105 @@ npm link node-red-contrib-file-template
 ]
 ```
 
-## Template Syntax
+---
 
-### Variable Substitution
-Use Mustache-style syntax for variable substitution:
+## 📄 Template Syntax Examples
 
-**Template File** (`templates/dashboard.html`):
-```html
-<div class="dashboard">
-    <h1>{{title}}</h1>
-    <p>Welcome, {{user.name}}!</p>
-    <div class="stats">
-        <span>Total Items: {{stats.total}}</span>
-        <span>Completed: {{stats.completed}}</span>
-    </div>
-</div>
+### Base Template (`base.njk`)
+```njk
+# {{ title }}
+
+{% block content %}
+Default content
+{% endblock %}
 ```
 
-**Input Message**:
-```javascript
+### Child Template (`incident.njk`)
+```njk
+{% extends "base.njk" %}
+
+{% block content %}
+## Incident Details
+- **Event**: {{ alert.event }}
+- **Severity**: {{ alert.severity }}
+- **Tags**:
+  {% for tag in alert.tags %}
+  - {{ tag }}
+  {% endfor %}
+{% endblock %}
+```
+
+### Input Message
+```json
 {
-    "payload": {
-        "title": "My Dashboard",
-        "user": {
-            "name": "John Doe"
-        },
-        "stats": {
-            "total": 25,
-            "completed": 18
-        }
-    }
+  "payload": {
+    "alert": {
+      "event": "High CPU Load",
+      "severity": "critical",
+      "tags": ["production", "server"]
+    },
+    "title": "System Alert"
+  }
 }
 ```
 
-**Output** (`msg.template`):
-```html
-<div class="dashboard">
-    <h1>My Dashboard</h1>
-    <p>Welcome, John Doe!</p>
-    <div class="stats">
-        <span>Total Items: 25</span>
-        <span>Completed: 18</span>
-    </div>
-</div>
+### Output (Markdown)
+```markdown
+# System Alert
+
+## Incident Details
+- **Event**: High CPU Load
+- **Severity**: critical
+- **Tags**:
+  - production
+  - server
 ```
 
-### Nested Properties
-Access nested object properties using dot notation:
-```html
-<p>{{user.profile.email}}</p>
-<p>{{settings.theme.primaryColor}}</p>
-```
+---
 
-### Default Values
-If a variable doesn't exist, it will be replaced with an empty string:
-```html
-<p>{{nonexistent.property}}</p>  <!-- Results in: <p></p> -->
-```
+## 🧩 Configuration Options
 
-## File Watching
+| Option | Description | Default |
+|--------|-------------|---------|
+| **Name** | Node display name | (auto-generated) |
+| **Template File** | Path to template file (optional) | *none* |
+| **Engine** | Template engine: mustache / handlebars / nunjucks | `nunjucks` |
+| **Inline Template** | Inline template content (fallback) | *empty* |
+| **Data Source** | Message property with template data (`payload` by default) | `payload` |
+| **Source Type** | Where to get data from: `msg`, `flow`, `global` | `msg` |
+| **Output** | Output format: `str` or `parsed` | `str` |
+
+---
+
+## 🖥️ Editor Snippets
+
+✅ Built-in snippets for Jinja2/Nunjucks syntax:
+
+| Shortcut | Inserts |
+|---------|---------|
+| `block` | `{% block %}...{% endblock %}` |
+| `extends` | `{% extends "..." %}` |
+| `include` | `{% include "..." %}` |
+| `if` | `{% if %}...{% endif %}` |
+| `for` | `{% for %}...{% endfor %}` |
+| `var` | `{{ variable }}` |
+| `filter` | `| filter` |
+| `comment` | `{# comment #}` |
+
+---
+
+## 📁 File Watching
 
 The node automatically watches your template files for changes:
 
-- ✅ **File Modified**: Automatically reloads content when you save changes
-- ⚠️ **File Deleted**: Shows warning status, falls back to inline template if available
-- 🔄 **File Restored**: Automatically detects when file is restored and reloads
+- ✅ **File Modified**: Automatically reloads content when saved
+- ⚠️ **File Deleted**: Shows warning, falls back to inline template
+- 🔄 **File Restored**: Detects and reloads automatically
 - 📊 **Status Updates**: Visual indicators show current file status
 
-## Status Indicators
+---
+
+## 🌈 Status Indicators
 
 | Color | Meaning |
 |-------|---------|
@@ -150,131 +187,136 @@ The node automatically watches your template files for changes:
 | 🔴 **Red** | Error loading file or processing template |
 | ⚪ **Grey** | No file specified or node inactive |
 
-## Output Format
+---
 
-The node adds the processed template to `msg.template` and includes metadata:
+## 📤 Output Format
+
+The processed template is added to `msg.template` and includes metadata:
 
 ```javascript
 {
-    "template": "<html>...</html>",  // Processed template content
-    "_fileTemplate": {               // Metadata
-        "filename": "templates/dashboard.html",
-        "lastModified": 1640995200000,
-        "length": 2048,
-        "format": "handlebars"
+    "template": "# System Alert\n...",
+    "_fileTemplate": {
+        "filename": "templates/incident.njk",
+        "lastModified": 1718000000,
+        "length": 256,
+        "engine": "nunjucks"
     }
 }
 ```
 
-## Use Cases
+---
 
-### Dashboard Templates
-Perfect for Node-RED dashboards with large HTML templates:
-```
-[data source] → [file-template] → [dashboard template]
-```
+## 🧰 Use Cases
 
-### Web Applications
-Generate dynamic web pages:
-```
-[HTTP request] → [data processing] → [file-template] → [HTTP response]
+### 📋 Markdown Reports
+Generate dynamic reports in Markdown:
+```bash
+[data] → [file-nunjucks] → [debug/email/http]
 ```
 
-### Email Templates
-Create dynamic email content:
-```
-[trigger] → [user data] → [file-template] → [email sender]
-```
-
-### Report Generation
-Generate HTML reports from data:
-```
-[database query] → [data formatting] → [file-template] → [PDF converter]
+### 📬 Email Templates
+Render HTML or plain text emails dynamically:
+```bash
+[trigger] → [data] → [file-nunjucks] → [email sender]
 ```
 
-## Advanced Features
+### 📊 Dashboard UI
+Use Nunjucks templates inside Node-RED Dashboard:
+```bash
+[file-nunjucks] → [ui_template]
+```
+
+### 📄 Document Generation
+Create templates for PDF, DOCX, etc.:
+```bash
+[data query] → [file-nunjucks] → [pdf converter]
+```
+
+---
+
+## 🛠 Advanced Features
 
 ### Multiple Data Sources
-Pull template data from different contexts:
+Pull template data from:
 - `msg` - From incoming message (default)
 - `flow` - From flow context
 - `global` - From global context
 
-### Error Recovery
-- Automatic retry on file system errors
-- Fallback to inline template content
-- Graceful handling of malformed templates
-- Detailed error logging
+### Filters & Macros
+Register custom filters/macros in context:
+```js
+context.nj.addFilter('uppercase', str => str.toUpperCase());
+```
 
-### Performance Optimization
-- File content caching
-- Modification time checking (only reload when changed)
-- Efficient file watching with chokidar
-- Memory-efficient string processing
+### Async Support
+Support for asynchronous tags like `{% asyncEach %}`
 
-## Troubleshooting
+### Partials
+Use `{% include %}` and `{% import %}` for reusable components
+
+---
+
+## 🔍 Troubleshooting
 
 ### Common Issues
 
 **Template file not found**
-- Verify the file path is relative to Node-RED working directory
-- Check file permissions
-- Ensure the file exists and is readable
+- Check path is relative to Node-RED working directory
+- Ensure file exists and has proper permissions
 
 **Variables not substituting**
-- Verify the input data structure matches your template variables
-- Check that the data is in the specified message property (`payload` by default)
-- Ensure you're using correct Mustache syntax: `{{variable}}`
+- Verify data structure matches your template keys
+- Ensure correct engine selected (`nunjucks` vs `mustache`)
 
 **File watching not working**
-- Some file systems (like network drives) may not support file watching
-- Restart Node-RED if file watching stops working
-- Check Node-RED logs for file watcher errors
+- Some systems (like Docker or network drives) may have issues
+- Restart Node-RED if it stops detecting changes
 
-### Debug Tips
+---
 
-1. **Check Status**: Node status indicator shows current state
-2. **View Logs**: Check Node-RED debug panel for detailed error messages
-3. **Test Data**: Use a debug node to verify your input data structure
-4. **File Permissions**: Ensure Node-RED has read access to template files
+## 🔄 Fork Notice
 
-## Development
+This project is a maintained fork of the original [node-red-contrib-file-template](https://github.com/DanEdens/node-red-contrib-file-template ) created by [@DanEdens](https://github.com/DanEdens ).
 
-### Local Development
-```bash
-git clone https://github.com/danedens/node-red-contrib-file-template.git
-cd node-red-contrib-file-template
-npm install
-npm link
-cd ~/.node-red
-npm link node-red-contrib-file-template
-# Restart Node-RED
-```
+The original repository has been extended to support:
+- Nunjucks (Jinja2-style) templates with inheritance and blocks
+- Markdown-ready output
+- Enhanced editor snippets and autocomplete
+- Full support for modern template workflows
 
-### Testing
-```bash
-npm test
-```
+All credits for the initial implementation go to Dan Edens.
 
-### Contributing
-1. Fork the repository
+---
+
+## 🛡️ License
+
+MIT License — see [LICENSE](LICENSE) for details
+
+---
+
+## 🤝 Contributing
+
+1. Fork the repo
 2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
+3. Make changes
+4. Add tests where applicable
+5. Submit a PR
 
-## License
+---
 
-MIT License - see [LICENSE](LICENSE) file for details.
+## 📣 Support
 
-## Support
+- 🐛 **Issues**: [GitHub Issues](https://github.com/untitledds/node-red-contrib-file-nunjucks/issues)
+- 💬 **Discussions**: [GitHub Discussions](https://github.com/untitledds/node-red-contrib-file-nunjucks/discussions)
 
-- 🐛 **Issues**: [GitHub Issues](https://github.com/danedens/node-red-contrib-file-template/issues)
-- 💬 **Discussions**: [GitHub Discussions](https://github.com/danedens/node-red-contrib-file-template/discussions)
-- 📧 **Email**: your.email@example.com
+---
 
-## Related Nodes
+## 🔄 Related Nodes
 
-- [node-red-contrib-file-function](https://flows.nodered.org/node/node-red-contrib-file-function) - File-based function nodes
-- [node-red-dashboard](https://flows.nodered.org/node/node-red-dashboard) - Dashboard templates
-- [node-red-node-email](https://flows.nodered.org/node/node-red-node-email) - Email integration
+- [node-red-dashboard](https://flows.nodered.org/node/node-red-dashboard) – For UI rendering
+- [node-red-node-email](https://flows.nodered.org/node/node-red-node-email) – Send templated emails
+- [node-red-contrib-ui-template](https://flows.nodered.org/node/node-red-contrib-ui-template) – Custom dashboard widgets
+- [node-red-contrib-file-template](https://github.com/DanEdens/node-red-contrib-file-template) - 
+
+---

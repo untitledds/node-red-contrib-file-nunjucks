@@ -1,42 +1,67 @@
 {
-  "name": "node-red-contrib-file-template",
-  "version": "1.1.5",
-  "description": "A Node-RED node that loads HTML template content from the filesystem with automatic file watching, reloading, and built-in file editor",
-  "main": "file-template.js",
+  "name": "node-red-contrib-file-nunjucks",
+  "version": "1.2.0",
+  "description": "A secure Node-RED node for template processing with sandboxing, file watching and multiple engines support",
+  "main": "file-nunjucks.js",
   "scripts": {
-    "test": "node test.js"
+    "test": "echo \"Error: no test specified\" && exit 0",
+    "lint": "eslint . --ext .js,.jsx,.ts,.tsx,.html --fix"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/DanEdens/node-red-contrib-file-template.git"
+    "url": "git+https://github.com/untitledds/node-red-contrib-file-nunjucks.git"
   },
   "keywords": [
     "node-red",
-    "ui",
     "template",
-    "html",
-    "file",
-    "filesystem",
-    "watch",
-    "dashboard",
+    "nunjucks",
+    "jinja2",
+    "handlebars",
     "mustache",
-    "handlebars"
+    "markdown",
+    "sandbox",
+    "security",
+    "filesystem"
   ],
-  "author": "D. Edens <d.edens@todomill.dev>",
+  "author": "untitledds <untitledds@gmail.com>",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/DanEdens/node-red-contrib-file-template/issues"
+    "url": "https://github.com/untitledds/node-red-contrib-file-nunjucks/issues"
   },
-  "homepage": "https://github.com/DanEdens/node-red-contrib-file-template#readme",
+  "homepage": "https://github.com/untitledds/node-red-contrib-file-nunjucks#readme",
   "node-red": {
+    "version": ">=4.0.9",
     "nodes": {
-      "file-template": "file-template.js"
+      "file-nunjucks": "file-nunjucks.js"
     }
   },
   "dependencies": {
-    "chokidar": "^3.5.3"
+    "chokidar": "^3.6.0",
+    "debounce": "^2.2.0",
+    "json-stringify-safe": "^5.0.1",
+    "lru-cache": "^7.18.3",
+    "marked": "^4.3.0",
+    "moment": "^2.29.4",
+    "mustache": "^4.2.0",
+    "node-red-contrib-file-nunjucks": "file:node-red-contrib-file-nunjucks-1.2.0.tgz",
+    "nunjucks": "^3.2.4"
   },
   "engines": {
-    "node": ">=12.0.0"
+    "node": ">=16.0.0"
+  },
+  "files": [
+    "file-nunjucks.js",
+    "file-nunjucks.html",
+    "sandbox.js",
+    "README.md",
+    "LICENSE"
+  ],
+  "devDependencies": {
+    "@eslint/js": "^9.25.1",
+    "eslint": "^9.25.1",
+    "eslint-plugin-html": "^8.1.2",
+    "eslint-plugin-import": "^2.31.0",
+    "eslint-plugin-node": "^11.1.0",
+    "globals": "^16.0.0"
   }
 }
