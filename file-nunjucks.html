@@ -30,7 +30,9 @@
         icon: "nunjucks.png",
         paletteLabel: "File Nunjucks",
         defaults: {
+            sourceType: { value: "file", required: true },
             filename: { value: "", required: false },
+            folderPath: { value: "", required: false },
             engine: { value: "nunjucks", required: true },
             template: { value: "" },
             field: { value: "payload" },
@@ -59,7 +61,14 @@
                 value: this.template
             });
 
-            // Настройка переключателей
+            // Установка значений
+            $("#node-input-filename").val(this.filename || '');
+            $("#node-input-folderPath").val(this.folderPath || '');
+            $("#node-input-engine").val(this.engine || 'nunjucks');
+            $("#node-input-field").val(this.field || 'payload');
+            $("#node-input-fieldType").val(this.fieldType || 'msg');
+            $("#node-input-output").val(this.output || 'str');
+            $("#node-input-name").val(this.name || '');
             $("#node-input-watchMode").prop("checked", this.watchMode);
             $("#node-input-cacheTemplates").prop("checked", this.cacheTemplates);
             $("#node-input-sandbox").prop("checked", this.sandbox);
@@ -70,7 +79,18 @@
             $("#node-input-preProcessHook").val(this.preProcessHook || "");
             $("#node-input-postProcessHook").val(this.postProcessHook || "");
 
-            // Валидация JSON
+            // Переключение видимости полей
+            function toggleFilenameField() {
+                const isFile = $("#node-input-sourceType").val() === 'file';
+                $("#filename-row").toggle(isFile);
+                $("#folderpath-row").toggle(!isFile);
+            }
+
+            $("#node-input-sourceType").on("change", toggleFilenameField);
+            $("#node-input-sourceType").val(this.sourceType || 'file');
+            toggleFilenameField(); // вызов на старте
+
+            // Обработчики кнопок и валидации
             $("#node-input-check-filters").on("click", function () {
                 try {
                     JSON.parse($("#node-input-customFilters").val());
@@ -80,7 +100,6 @@
                 }
             });
 
-            // Пример Markdown
             $("#node-input-markdown-example").on("click", function () {
                 const example = `<!-- markdown -->
 # {{ title }}
@@ -91,7 +110,6 @@
                 this.editor.setValue(example);
             }.bind(this));
 
-            // Пример фильтра
             $("#node-input-filter-example").on("click", function () {
                 const example = '{"uppercase":"function(str){return str.toUpperCase();}"}';
                 $("#node-input-customFilters").val(example);
@@ -109,20 +127,45 @@
             this.preProcessHook = $("#node-input-preProcessHook").val();
             this.postProcessHook = $("#node-input-postProcessHook").val();
 
+            // Сохраняем настройки
+            this.sourceType = $("#node-input-sourceType").val();
+            this.filename = $("#node-input-filename").val();
+            this.folderPath = $("#node-input-folderPath").val();
+            this.engine = $("#node-input-engine").val();
+            this.field = $("#node-input-field").val();
+            this.fieldType = $("#node-input-fieldType").val();
+            this.output = $("#node-input-output").val();
+            this.name = $("#node-input-name").val();
+
             this.editor.destroy();
             delete this.editor;
         },
         oneditcancel: function () {
-            this.editor.destroy();
-            delete this.editor;
-        }
-    });
+            $("#node-input-sourceType").off("change"); // Удаляем обработчик
+            if (this.editor) {
+                this.editor.destroy();
+                delete this.editor;
+            }
+        }    });
 </script>
 
 <script type="text/html" data-template-name="file-nunjucks">
     <div class="form-row">
+        <label for="node-input-sourceType">Source Type</label>
+        <select id="node-input-sourceType" style="width: 70%;">
+            <option value="file">File</option>
+            <option value="folder">Folder</option>
+        </select>
+    </div>
+
+    <div class="form-row" id="filename-row">
         <label for="node-input-filename"><i class="fa fa-file-text"></i> Template File</label>
         <input type="text" id="node-input-filename" placeholder="path/to/template.njk">
+    </div>
+
+    <div class="form-row" id="folderpath-row">
+        <label for="node-input-folderPath"><i class="fa fa-folder-open"></i> Template Folder</label>
+        <input type="text" id="node-input-folderPath" placeholder="path/to/templates">
     </div>
 
     <div class="form-row">
@@ -229,18 +272,20 @@
     </div>
 </script>
 <script type="text/html" data-help-name="file-nunjucks">
-    <p>Render templates using Nunjucks, Mustache or Handlebars with advanced features including file watching, Markdown rendering, sandboxed execution and customizable filters.</p>
+    <p>Render templates using Nunjucks, Mustache or Handlebars with advanced features including file watching, Markdown rendering, sandboxed execution and customizable filters. Supports dynamic template selection from message properties and folder-based template loading.</p>
 
     <h3>Features</h3>
     <ul>
         <li><strong>Multiple Template Engines</strong>: Nunjucks (full Jinja2-style), Mustache, Handlebars</li>
         <li><strong>File-based Templates</strong> with automatic reloading on change (<code>watchMode</code>)</li>
         <li><strong>Inline Templates</strong> for quick use without external files</li>
+        <li><strong>Dynamic File Selection</strong> via <code>msg.filename</code> to choose template at runtime</li>
+        <li><strong>Folder-based Template Loading</strong> — automatically load and watch all <code>.njk</code>, <code>.md</code>, <code>.html</code> files in a directory</li>
         <li><strong>Markdown Support</strong> via <code>marked.js</code>, either by file extension <code>.md</code> or comment <code><!-- markdown --></code></li>
         <li><strong>Sandbox Mode</strong> to restrict access to sensitive properties like <code>__proto__</code>, <code>constructor</code>, and prevent object mutation</li>
         <li><strong>Custom Filters</strong> defined via JSON configuration (supports dynamic functions)</li>
         <li><strong>Lifecycle Hooks</strong>: Pre-process and post-process hooks for template manipulation before and after rendering</li>
-        <li><strong>Template Caching</strong> using LRU cache to improve performance</li>
+        <li><strong>Template Caching</strong> using LRU cache to improve performance (per-file caching)</li>
         <li><strong>Debounce File Watching</strong> to avoid excessive reloads during rapid edits</li>
         <li><strong>Secure Path Handling</strong>: Prevents path traversal and restricts access outside working directory</li>
         <li><strong>LRU Environment Caching</strong> for compiled environments to reduce overhead</li>
@@ -249,10 +294,23 @@
 
     <h3>Usage</h3>
     <ol>
+        <li>Select source type: <strong>File</strong> or <strong>Folder</strong></li>
+        <li>If using <strong>File</strong> mode:
+            <ul>
+                <li>Specify the template file path</li>
+                <li>Choose between static path or dynamic path via <code>msg.filename</code></li>
+            </ul>
+        </li>
+        <li>If using <strong>Folder</strong> mode:
+            <ul>
+                <li>Specify the folder path</li>
+                <li>Select template dynamically via <code>msg.filename</code> (relative to folder)</li>
+                <li>Enable <strong>Watch Mode</strong> to auto-reload modified files</li>
+            </ul>
+        </li>
         <li>Select a template engine: Nunjucks (recommended), Mustache, or Handlebars</li>
         <li>Specify the source of your data via <code>msg.payload</code>, <code>flow</code>, or <code>global</code></li>
-        <li>Choose to load from an external file or provide inline template content</li>
-        <li>Enable <strong>Watch Mode</strong> to auto-reload when the file changes</li>
+        <li>Enable <strong>Watch Mode</strong> to auto-reload when the file or folder changes</li>
         <li>Use <strong>Cache Templates</strong> to speed up repeated rendering</li>
         <li>Enable <strong>Sandbox Mode</strong> to protect against prototype pollution and unsafe property access</li>
         <li>Add <strong>Custom Filters</strong> via JSON to extend template logic (e.g. date formatting, default values, transformations)</li>
@@ -297,20 +355,39 @@ Status: {{ project.status }}
     <h4>4. Custom Filters (JSON)</h4>
     <pre><code>{"uppercase": "function(str) { return str.toUpperCase(); }", "default": "function(val, def) { return val !== undefined ? val : def; }"}</code></pre>
 
-    <h4>5. Sample Input Message</h4>
+    <h4>5. Sample Input Message (static file)</h4>
     <pre><code>{
-  "title": "Weekly Report",
-  "user": {
-    "name": "John Doe"
-  },
-  "stats": {
-    "total": 100,
-    "completed": 84
-  },
-  "tags": ["dev", "admin"],
-  "project": {
-    "name": "Dashboard v2",
-    "status": "In Progress"
+  "filename": "templates/report.njk",
+  "payload": {
+    "title": "Weekly Report",
+    "user": {
+      "name": "John Doe"
+    },
+    "stats": {
+      "total": 100,
+      "completed": 84
+    },
+    "tags": ["dev", "admin"],
+    "project": {
+      "name": "Dashboard v2",
+      "status": "In Progress"
+    }
+  }
+}</code></pre>
+
+    <h4>6. Sample Folder Setup</h4>
+    <pre><code>// Configuration:
+{
+  "sourceType": "folder",
+  "folderPath": "/data/templates"
+}
+
+// Send message:
+{
+  "filename": "invoice.njk",
+  "payload": {
+    "customer": "Alice",
+    "amount": 200
   }
 }</code></pre>
 
@@ -327,6 +404,7 @@ Status: {{ project.status }}
     <ul>
         <li>LRU caching for compiled templates and environments</li>
         <li>Debounced file watching for frequent edits</li>
+        <li>Per-file caching even in folder mode</li>
     </ul>
 
     <h3>Advanced Options</h3>

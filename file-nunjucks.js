@@ -1,15 +1,13 @@
 module.exports = function (RED) {
   'use strict';
-
   const fs = require('fs').promises;
   const path = require('path');
   const chokidar = require('chokidar');
   const nunjucks = require('nunjucks');
   const marked = require('marked');
   const LRU = require('lru-cache');
-  const debounce = require('debounce'); 
+  const debounce = require('debounce');
   const createSandbox = require('./sandbox');
-    
 
   // Caches
   const envCache = new LRU({ max: 50 });
@@ -20,18 +18,18 @@ module.exports = function (RED) {
     const node = this;
 
     // Configuration
+    node.sourceType = config.sourceType || 'file'; // 'file' or 'folder'
     node.filename = config.filename || '';
+    node.folderPath = config.folderPath || '';
     node.engine = config.engine || 'nunjucks';
-    node.template = config.template || '';
     node.field = config.field || 'payload';
     node.fieldType = config.fieldType || 'msg';
     node.output = config.output || 'str';
     node.name = config.name;
-    node.loadOnBoot = config.loadOnBoot || false;
-    node.bootData = config.bootData || '{}';
+    node.loadOnBoot = config.loadOnBoot !== false;
     node.bootDelay = parseInt(config.bootDelay) || 1000;
     node.watchMode = config.watchMode !== false;
-    node.cacheTemplates = config.cacheTemplates || false;
+    node.cacheTemplates = config.cacheTemplates !== false;
     node.sandbox = config.sandbox !== false;
 
     try {
@@ -49,14 +47,30 @@ module.exports = function (RED) {
       node.status({ fill: color, shape: 'dot', text: text });
     }
 
-    async function loadTemplate() {
-      if (!node.filename) return;
+    async function resolveFilePath(msg) {
+      let filename;
+      if (node.sourceType === 'file') {
+        filename = node.filename;
+      } else {
+        filename = RED.util.getMessageProperty(msg, 'filename');
+      }
 
-      const fullPath = path.resolve(node.filename);
+      if (!filename) throw new Error('Filename not provided');
+
+      const basePath = node.sourceType === 'file' ? filename : path.join(node.folderPath, filename);
+      const fullPath = path.resolve(basePath);
 
       // Security check
       if (!fullPath.startsWith(process.cwd())) {
         throw new Error(`Access denied to file path: ${fullPath}`);
+      }
+
+      return fullPath;
+    }
+
+    async function loadTemplate(fullPath) {
+      if (!fullPath) {
+        throw new Error('Cannot load template: fullPath is undefined');
       }
 
       try {
@@ -68,7 +82,6 @@ module.exports = function (RED) {
           fileContent = await fs.readFile(fullPath, 'utf8');
           const stats = await fs.stat(fullPath);
           lastModified = stats.mtimeMs;
-
           if (node.cacheTemplates) {
             templateCache.set(fullPath, {
               content: fileContent,
@@ -76,7 +89,6 @@ module.exports = function (RED) {
             });
           }
         }
-
         updateStatus(`Loaded: ${path.basename(fullPath)} (${fileContent.length} chars)`, 'green');
       } catch (err) {
         updateStatus('Error loading', 'red');
@@ -85,26 +97,24 @@ module.exports = function (RED) {
       }
     }
 
-    function setupWatcher() {
-      if (!node.filename || !node.watchMode) return;
+    function setupWatcherForFolder() {
+      if (!node.folderPath || !node.watchMode || node.sourceType !== 'folder') return;
 
-      const fullPath = path.resolve(node.filename);
+      const resolvedPath = path.resolve(node.folderPath);
 
       if (watcher) {
-        watcher.close().catch(err => {
-          node.error('Error closing previous watcher:', err);
-        });
+        watcher.close().catch(err => node.error('Error closing previous watcher:', err));
       }
 
-      const debouncedReload = debounce(() => {
-        loadTemplate().catch(err => {
-          node.error('Error reloading template:', err);
-        });
+      const debouncedReload = debounce(async (filePath) => {
+        if (/\.(njk|html|md)$/i.test(filePath)) {
+          await loadTemplate(filePath);
+        }
       }, 500);
 
-      watcher = chokidar.watch(fullPath, {
+      watcher = chokidar.watch(resolvedPath, {
         persistent: true,
-        ignoreInitial: true,
+        ignoreInitial: false,
         awaitWriteFinish: {
           stabilityThreshold: 500,
           pollInterval: 100
@@ -112,27 +122,26 @@ module.exports = function (RED) {
       });
 
       watcher.on('change', debouncedReload);
-      watcher.on('error', (error) => {
-        node.error(`File watcher error: ${error.message}`);
-        updateStatus('Watcher error', 'red');
+      watcher.on('add', debouncedReload);
+      watcher.on('unlink', (filePath) => {
+        node.warn(`File removed: ${filePath}`);
+        templateCache.delete(filePath);
       });
-      watcher.on('unlink', () => {
-        updateStatus('File deleted', 'red');
-        node.warn(`Template file deleted: ${fullPath}`);
+
+      watcher.on('error', error => {
+        node.error(`Folder watcher error: ${error.message}`);
+        updateStatus('Watcher error', 'red');
       });
     }
 
-    function getNunjucksEnv() {
-      const dir = path.dirname(node.filename || '.');
+    function getNunjucksEnv(fullPath) {
+      const dir = path.dirname(fullPath || '.');
       const cacheKey = `${dir}:${node.sandbox}`;
-
-      if (envCache.has(cacheKey)) {
-        return envCache.get(cacheKey);
-      }
+      if (envCache.has(cacheKey)) return envCache.get(cacheKey);
 
       const loader = new nunjucks.FileSystemLoader(dir, {
         noCache: !node.cacheTemplates,
-        watch: false // We handle watching ourselves
+        watch: false
       });
 
       const env = new nunjucks.Environment(loader, {
@@ -145,7 +154,6 @@ module.exports = function (RED) {
         const moment = require('moment');
         return moment(date).format(format);
       });
-
       env.addFilter('uppercase', str => str?.toUpperCase() || '');
       env.addFilter('lowercase', str => str?.toLowerCase() || '');
       env.addFilter('default', (value, defaultValue) => value ?? defaultValue);
@@ -174,16 +182,34 @@ module.exports = function (RED) {
 
     async function processMessage(msg) {
       try {
-        if (!fileContent && node.filename) {
-          await loadTemplate();
+        // Берём путь к файлу из msg.filename, если он есть
+        const filename = RED.util.getMessageProperty(msg, 'filename') || node.filename;
+
+        if (!filename) {
+          throw new Error('Filename not provided in message or configuration');
         }
 
-        const templateContent = fileContent || node.template;
+        const fullPath = await resolveFilePath(msg);
+
+        // Security check
+        if (!fullPath.startsWith(process.cwd())) {
+          throw new Error(`Access denied to file path: ${fullPath}`);
+        }
+
+        let templateContent;
+
+        // Если файл изменился или ещё не загружен
+        if (!fileContent || lastModified === 0 || (await fs.stat(fullPath)).mtimeMs > lastModified) {
+          await loadTemplate(fullPath);
+        }
+
+        templateContent = fileContent;
+
         if (!templateContent) {
           throw new Error('No template content available');
         }
 
-        // Get template data
+        // Получаем данные для шаблона
         let templateData;
         switch (node.fieldType) {
         case 'flow':
@@ -197,43 +223,39 @@ module.exports = function (RED) {
           templateData = RED.util.getMessageProperty(msg, node.field) || msg.payload || {};
         }
 
-        // Add current time
+        // Добавляем текущее время
         templateData.now = new Date();
 
-        // Apply sandbox if enabled
+        // Применяем песочницу, если включена
         const safeData = node.sandbox ? createSandbox(templateData) : templateData;
 
-        // Process template
+        // Обработка шаблона
         let result;
         if (node.engine === 'nunjucks') {
-          const env = getNunjucksEnv();
+          const env = getNunjucksEnv(fullPath);
           result = env.renderString(templateContent, safeData);
-        }
-        else if (node.engine === 'mustache' || node.engine === 'handlebars') {
+        } else if (node.engine === 'mustache' || node.engine === 'handlebars') {
           result = templateContent.replace(/\{\{([^}]+)\}\}/g, (match, key) => {
             return key.trim().split('.').reduce((obj, k) =>
               (obj && typeof obj === 'object' && k in obj) ? obj[k] : match,
             safeData
             ) || '';
           });
-        }
-        else {
+        } else {
           throw new Error(`Unsupported template engine: ${node.engine}`);
         }
 
-        // Process Markdown if needed
-        if (node.filename.endsWith('.md') || templateContent.includes('<!-- markdown -->')) {
+        // Markdown
+        if (fullPath.endsWith('.md') || templateContent.includes('<!-- markdown -->')) {
           result = marked.parse(result);
         }
 
-        // Prepare output
-        msg.template = (node.output === 'parsed') ?
-          tryParseJSON(result) :
-          result;
+        // Подготовка результата
+        msg.template = (node.output === 'parsed') ? tryParseJSON(result) : result;
 
-        // Add metadata
+        // Метаданные
         msg._fileTemplate = {
-          filename: node.filename,
+          filename: fullPath,
           engine: node.engine,
           length: result.length,
           cached: node.cacheTemplates,
@@ -263,13 +285,16 @@ module.exports = function (RED) {
       const safeDone = (err) => {
         if (typeof done === 'function') {
           done(err);
-        } else {
-          if (err) {
-            node.error(`Unhandled error in input handler: ${err.message}`, msg);
-          }
+        } else if (err) {
+          node.error(`Unhandled error in input handler: ${err.message}`, msg);
         }
       };
+
       try {
+        if (node.watchMode && node.sourceType === 'folder') {
+          setupWatcherForFolder();
+        }
+
         const result = await processMessage(msg);
         send(result);
         safeDone();
@@ -281,7 +306,6 @@ module.exports = function (RED) {
     node.on('close', async function (done) {
       try {
         const cleanupTasks = [];
-
         if (watcher) {
           cleanupTasks.push(
             watcher.close()
@@ -299,41 +323,37 @@ module.exports = function (RED) {
         await Promise.all(cleanupTasks);
         updateStatus('', 'grey');
         done();
-
       } catch (err) {
         node.error('Cleanup error:', err);
         done(err);
       }
     });
 
-    // Initialization
-    if (node.filename) {
-      loadTemplate()
-        .then(() => {
-          if (node.watchMode) setupWatcher();
-        })
-        .catch(err => {
-          node.error(`Initial template load failed: ${err.message}`);
-        });
-    } else {
-      updateStatus('No file specified', 'grey');
+    // Initial load
+    if (node.loadOnBoot && node.sourceType === 'file' && node.filename) {
+      setTimeout(async () => {
+        try {
+          const fullPath = await resolveFilePath(null);
+          await loadTemplate(fullPath);
+          if (node.watchMode) {
+            setupWatcherForFolder();
+          }
+        } catch (err) {
+          node.error(`Initial load failed: ${err.message}`);
+        }
+      }, node.bootDelay);
     }
   }
 
   RED.nodes.registerType('file-nunjucks', FileNunjucksNode);
 
-  // HTTP API endpoints
+  // HTTP API
   RED.httpAdmin.post('/file-nunjucks/load-file', async function (req, res) {
     try {
       const filename = req.body.filename;
-      if (!filename) {
-        return res.status(400).json({ error: 'Filename is required' });
-      }
-
+      if (!filename) return res.status(400).json({ error: 'Filename is required' });
       const fullPath = path.resolve(filename);
-      if (!fullPath.startsWith(process.cwd())) {
-        return res.status(403).json({ error: 'Access denied' });
-      }
+      if (!fullPath.startsWith(process.cwd())) return res.status(403).json({ error: 'Access denied' });
 
       const [content, stats] = await Promise.all([
         fs.readFile(fullPath, 'utf8'),
@@ -347,12 +367,8 @@ module.exports = function (RED) {
         mtime: stats.mtime.getTime(),
         filename: path.basename(fullPath)
       });
-
     } catch (err) {
-      res.status(500).json({
-        error: 'File read failed',
-        details: err.message
-      });
+      res.status(500).json({ error: 'File read failed', details: err.message });
     }
   });
 
@@ -364,9 +380,7 @@ module.exports = function (RED) {
       }
 
       const fullPath = path.resolve(filename);
-      if (!fullPath.startsWith(process.cwd())) {
-        return res.status(403).json({ error: 'Access denied' });
-      }
+      if (!fullPath.startsWith(process.cwd())) return res.status(403).json({ error: 'Access denied' });
 
       await fs.mkdir(path.dirname(fullPath), { recursive: true });
       await fs.writeFile(fullPath, content, 'utf8');
@@ -376,12 +390,24 @@ module.exports = function (RED) {
         size: content.length,
         filename: path.basename(fullPath)
       });
-
     } catch (err) {
-      res.status(500).json({
-        error: 'File save failed',
-        details: err.message
-      });
+      res.status(500).json({ error: 'File save failed', details: err.message });
+    }
+  });
+
+  RED.httpAdmin.get('/file-nunjucks/list', async function (req, res) {
+    const folderPath = req.query.folder;
+    if (!folderPath) return res.status(400).json({ error: 'Folder path is required' });
+
+    const fullPath = path.resolve(folderPath);
+    if (!fullPath.startsWith(process.cwd())) return res.status(403).json({ error: 'Access denied' });
+
+    try {
+      const files = await fs.readdir(fullPath);
+      const templates = files.filter(f => /\.(njk|html|md)$/i.test(f));
+      res.json({ templates });
+    } catch (err) {
+      res.status(500).json({ error: 'Failed to list files', details: err.message });
     }
   });
 };
